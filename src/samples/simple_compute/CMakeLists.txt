@@ -1,5 +1,6 @@
 set(RENDER_SOURCE
-        simple_compute.cpp)
+        simple_compute.cpp
+        random_array.cpp)
 
 add_executable(simple_compute main.cpp ${VK_UTILS_SRC} ${RENDER_SOURCE})
 
