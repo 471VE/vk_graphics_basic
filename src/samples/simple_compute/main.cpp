@@ -7,10 +7,11 @@
 #define RANDOM_SEED 42
 
 void realizationOnCPU() {
+  std::cout << "\nExecuting on CPU..." << std::endl;
   auto arr = generateRandomArray(RANDOM_SEED, ARRAY_SIZE);
+  std::vector<double> smoothed(ARRAY_SIZE);
 
   auto start = hr_clock::now();
-  double average = 0;
   for (int i = 0; i < ARRAY_SIZE; ++i) {
     double new_val = 0.;
     for (int j = -3; j <=3; ++j) {
@@ -19,13 +20,16 @@ void realizationOnCPU() {
         new_val += arr[idx];
       }
     }
-    average += (arr[i] - new_val / 7.);
+    smoothed[i] = (arr[i] - new_val / 7.);
   }
   auto finish = hr_clock::now();
-
+  
+  double average = 0.;
+  for(const auto& element: smoothed)
+    average += element;
   average /= double(ARRAY_SIZE);
-  std::cout << "Result on CPU: " << average << "." << std::endl;
-  std::cout << "CPU time: " << (finish - start).count() / 1e9 << " s." << std::endl;
+  std::cout << "Result:         " << average << "." << std::endl;
+  std::cout << "Execution time: " << (finish - start).count() / 1e9 << " s." << std::endl;
 }
 
 int main()
@@ -39,13 +43,9 @@ int main()
   }
 
   app->InitVulkan(nullptr, 0, VULKAN_DEVICE_ID);
-
-  std::cout << "\nArray size: " << ARRAY_SIZE << std::endl << std::endl;
+  std::cout << "\nArray size: " << ARRAY_SIZE << std::endl;
 
   app->Execute();
-
-  std::cout << std::endl;
-
   realizationOnCPU();
 
   return 0;

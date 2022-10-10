@@ -83,7 +83,7 @@ private:
   VkPipeline m_pipeline;
   VkPipelineLayout m_layout;
 
-  VkBuffer m_randomArray, m_sum;
+  VkBuffer m_randomArray, m_smoothedOutArray;
  
   void CreateInstance();
   void CreateDevice(uint32_t a_deviceId);
@@ -91,12 +91,14 @@ private:
   void BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkPipeline a_pipeline);
 
   void SetupSimplePipeline();
-  void CreateComputePipeline();
+  void CreateComputePipeline(const char* pathToShader);
   void CleanupPipeline();
 
   void Cleanup();
 
   void SetupValidationLayers();
+
+  void ExecuteOneShader(const char* pathToShader);
 };
 
 

@@ -1,0 +1,34 @@
+#version 430
+
+layout(local_size_x = 32) in;
+
+layout(std430, binding = 0) buffer RandomArray {
+    double random_array[];
+};
+
+layout(std430, binding = 1) buffer ArraySum {
+    double smoothed_out_array[];
+};
+
+shared double[32] window;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    uint local_idx = gl_LocalInvocationID.x;
+    window[local_idx] = random_array[idx];
+    barrier();
+
+    uint convolution_idx = idx - 3;
+    uint local_convolution_idx = local_idx - 3;
+    double new_value = 0.;
+    for (int i = 0; i < 7; ++i) {
+        if (local_convolution_idx < 32)
+            new_value += window[local_convolution_idx];            
+        else
+            new_value += random_array[convolution_idx];
+        convolution_idx++;
+        local_convolution_idx++;
+    }
+
+    smoothed_out_array[idx] = window[local_idx] - new_value / 7.;
+}

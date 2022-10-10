@@ -83,25 +83,25 @@ void SimpleCompute::SetupSimplePipeline()
 
   // Создание и аллокация буферов
   m_randomArray = vk_utils::createBuffer(m_device, sizeof(double) * m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-  m_sum = vk_utils::createBuffer(m_device, sizeof(double), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-  vk_utils::allocateAndBindWithPadding(m_device, m_physicalDevice, {m_randomArray, m_sum}, 0);
+                                                                              VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+  m_smoothedOutArray = vk_utils::createBuffer(m_device, sizeof(double)* m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                                                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+  vk_utils::allocateAndBindWithPadding(m_device, m_physicalDevice, {m_randomArray, m_smoothedOutArray}, 0);
 
   m_pBindings = std::make_shared<vk_utils::DescriptorMaker>(m_device, dtypes, 1);
 
   // Создание descriptor set для передачи буферов в шейдер
   m_pBindings->BindBegin(VK_SHADER_STAGE_COMPUTE_BIT);
   m_pBindings->BindBuffer(0, m_randomArray);
-  m_pBindings->BindBuffer(1, m_sum);
+  m_pBindings->BindBuffer(1, m_smoothedOutArray);
   m_pBindings->BindEnd(&m_sumDS, &m_sumDSLayout);
 
   // Заполнение буферов
   std::vector<double> values = generateRandomArray(m_seed, m_length);
   m_pCopyHelper->UpdateBuffer(m_randomArray, 0, values.data(), sizeof(double) * values.size());
 
-  double ZERO_DOUBLE = 0.;
-  m_pCopyHelper->UpdateBuffer(m_sum, 0, &ZERO_DOUBLE, sizeof(double));
+  std::vector<double> zeros_array(m_length, 0.);
+  m_pCopyHelper->UpdateBuffer(m_smoothedOutArray, 0, zeros_array.data(), sizeof(double) * zeros_array.size());
 }
 
 void SimpleCompute::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkPipeline)
@@ -120,8 +120,8 @@ void SimpleCompute::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkPipeli
 
   vkCmdPushConstants(a_cmdBuff, m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(m_length), &m_length);
 
-  uint number_of_groups = 1 + ((m_length - 1) / 1024);
-  vkCmdDispatch(a_cmdBuff, number_of_groups, 1, 1);
+  uint number_of_groups = 1 + ((m_length - 1) / 32);
+  vkCmdDispatch(a_cmdBuff, number_of_groups * 2, 1, 1);
 
   VK_CHECK_RESULT(vkEndCommandBuffer(a_cmdBuff));
 }
@@ -134,7 +134,7 @@ void SimpleCompute::CleanupPipeline()
     vkFreeCommandBuffers(m_device, m_commandPool, 1, &m_cmdBufferCompute);
   }
   vkDestroyBuffer(m_device, m_randomArray, nullptr);
-  vkDestroyBuffer(m_device, m_sum, nullptr);
+  vkDestroyBuffer(m_device, m_smoothedOutArray, nullptr);
 
   vkDestroyPipelineLayout(m_device, m_layout, nullptr);
   vkDestroyPipeline(m_device, m_pipeline, nullptr);
@@ -152,10 +152,10 @@ void SimpleCompute::Cleanup()
 }
 
 
-void SimpleCompute::CreateComputePipeline()
+void SimpleCompute::CreateComputePipeline(const char* pathToShader)
 {
   // Загружаем шейдер
-  std::vector<uint32_t> code = vk_utils::readSPVFile("../resources/shaders/simple.comp.spv");
+  std::vector<uint32_t> code = vk_utils::readSPVFile(pathToShader);
   VkShaderModuleCreateInfo createInfo = {};
   createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   createInfo.pCode    = code.data();
@@ -196,11 +196,9 @@ void SimpleCompute::CreateComputePipeline()
   vkDestroyShaderModule(m_device, shaderModule, nullptr);
 }
 
-
-void SimpleCompute::Execute()
-{
+void SimpleCompute::ExecuteOneShader(const char* pathToShader) {
   SetupSimplePipeline();
-  CreateComputePipeline();
+  CreateComputePipeline(pathToShader);
 
   BuildCommandBufferSimple(m_cmdBufferCompute, nullptr);
 
@@ -222,8 +220,23 @@ void SimpleCompute::Execute()
   VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &m_fence, VK_TRUE, 100000000000));
   auto finish = hr_clock::now();
 
-  double actual_sum;
-  m_pCopyHelper->ReadBuffer(m_sum, 0, &actual_sum, sizeof(double));
-  std::cout << "Result on GPU: " << actual_sum / double(m_length) << "." << std::endl;
-  std::cout << "GPU time: " << (finish - start).count() / 1e9 << " s." << std::endl;
+  std::vector<double> smoothedOutArray(m_length);
+  m_pCopyHelper->ReadBuffer(m_smoothedOutArray, 0, smoothedOutArray.data(), sizeof(double) * smoothedOutArray.size());
+
+  double average = 0.;
+  for(const auto& element: smoothedOutArray)
+    average += element;
+  average /= m_length;
+
+  std::cout << "Result:         " << average << "." << std::endl;
+  std::cout << "Execution time: " << (finish - start).count() / 1e9 << " s." << std::endl;
+}
+
+void SimpleCompute::Execute()
+{
+  std::cout << "\nExecuting on GPU without \'shared\' keyword..." << std::endl;
+  ExecuteOneShader("../resources/shaders/simple.comp.spv");
+
+  std::cout << "\nExecuting on GPU with \'shared\' keyword..." << std::endl;
+  ExecuteOneShader("../resources/shaders/simplev2.comp.spv");  
 }
