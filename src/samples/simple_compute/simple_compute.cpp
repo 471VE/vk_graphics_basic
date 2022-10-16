@@ -65,7 +65,7 @@ void SimpleCompute::CreateInstance()
 void SimpleCompute::CreateDevice(uint32_t a_deviceId)
 {
   m_physicalDevice = vk_utils::findPhysicalDevice(m_instance, true, a_deviceId, m_deviceExtensions);
-
+  m_enabledDeviceFeatures.shaderFloat64 = VK_TRUE;
   m_device = vk_utils::createLogicalDevice(m_physicalDevice, m_validationLayers, m_deviceExtensions,
                                            m_enabledDeviceFeatures, m_queueFamilyIDXs,
                                            VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT);
@@ -85,7 +85,8 @@ void SimpleCompute::SetupSimplePipeline()
   m_randomArray = vk_utils::createBuffer(m_device, sizeof(double) * m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                                                               VK_BUFFER_USAGE_TRANSFER_DST_BIT);
   m_smoothedOutArray = vk_utils::createBuffer(m_device, sizeof(double)* m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                                                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+                                                                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                                                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
   vk_utils::allocateAndBindWithPadding(m_device, m_physicalDevice, {m_randomArray, m_smoothedOutArray}, 0);
 
   m_pBindings = std::make_shared<vk_utils::DescriptorMaker>(m_device, dtypes, 1);
