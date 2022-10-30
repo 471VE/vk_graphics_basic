@@ -10,6 +10,8 @@
 #include <etna/RenderTargetStates.hpp>
 #include <vulkan/vulkan_core.h>
 
+#include <random>
+
 
 /// RESOURCE ALLOCATION
 
@@ -36,8 +38,37 @@ void SimpleShadowmapRender::AllocateResources()
     .bufferUsage = vk::BufferUsageFlagBits::eUniformBuffer,
     .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY
   });
-
   m_uboMappedMem = constants.map();
+
+  positionMatrices = m_context->createBuffer(etna::Buffer::CreateInfo 
+  {
+    .size = sizeof(LiteMath::float4x4) * m_numInstances,
+    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY
+  });
+  m_uboPositionMatrices  = positionMatrices.map();
+
+  instanceCount = m_context->createBuffer(etna::Buffer::CreateInfo
+  {
+    .size = sizeof(uint32_t),
+    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY
+  });
+  m_uboInstanceCount = instanceCount.map();
+
+  outputInstances = m_context->createBuffer(etna::Buffer::CreateInfo
+  {
+    .size        = sizeof(uint32_t) * m_numInstances,
+    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY
+  });
+  m_uboOutputInstances = outputInstances.map();
+
+  infoIndirect = m_context->createBuffer(etna::Buffer::CreateInfo{
+    .size        = sizeof(VkDrawIndexedIndirectCommand),
+    .bufferUsage = vk::BufferUsageFlagBits::eIndirectBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU });
+  m_sInfoIndirect    = infoIndirect.map();
 }
 
 void SimpleShadowmapRender::LoadScene(const char* path, bool transpose_inst_matrices)
@@ -114,8 +145,8 @@ static void print_prog_info(const std::string &name)
 
 void SimpleShadowmapRender::loadShaders()
 {
-  etna::create_program("simple_material",
-    {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple_shadow.frag.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
+  etna::create_program("frustum_culling", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/frustum_culling.comp.spv"});
+  etna::create_program("simple_material", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple_shadow.frag.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
   etna::create_program("simple_shadow", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
 }
 
@@ -123,7 +154,8 @@ void SimpleShadowmapRender::SetupSimplePipeline()
 {
   std::vector<std::pair<VkDescriptorType, uint32_t> > dtypes = {
       {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             1},
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,     2}
+      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,     2},
+      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,             3}
   };
 
   m_pBindings = std::make_shared<vk_utils::DescriptorMaker>(m_context->getDevice(), dtypes, 2);
@@ -131,6 +163,12 @@ void SimpleShadowmapRender::SetupSimplePipeline()
   m_pBindings->BindBegin(VK_SHADER_STAGE_FRAGMENT_BIT);
   m_pBindings->BindImage(0, shadowMap.getView({}), defaultSampler.get(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   m_pBindings->BindEnd(&m_quadDS, &m_quadDSLayout);
+  
+  m_pBindings->BindBegin(VK_SHADER_STAGE_COMPUTE_BIT);
+  m_pBindings->BindBuffer(0, positionMatrices.get());
+  m_pBindings->BindBuffer(1, instanceCount.get());
+  m_pBindings->BindBuffer(2, outputInstances.get());
+  m_pBindings->BindEnd(&m_computeDS, &m_computeDSLayout);
 
   etna::VertexShaderInputDescription sceneVertexInputDesc
     {
@@ -158,7 +196,10 @@ void SimpleShadowmapRender::SetupSimplePipeline()
           .depthAttachmentFormat = vk::Format::eD16Unorm
         }
     });
+  m_cullingPipeline      = pipelineManager.createComputePipeline("frustum_culling", {});
 
+  
+  print_prog_info("frustum_culling");
   print_prog_info("simple_material");
   print_prog_info("simple_shadow");
 }
@@ -172,28 +213,86 @@ void SimpleShadowmapRender::DestroyPipelines()
 
 /// COMMAND BUFFER FILLING
 
-void SimpleShadowmapRender::DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp)
+void SimpleShadowmapRender::CreateInstances()
 {
-  VkShaderStageFlags stageFlags = (VK_SHADER_STAGE_VERTEX_BIT);
+  std::mt19937 generator;
+  generator.seed(40);
+  std::uniform_real_distribution<float> uniform(-800.f, 800.f);
+  std::vector<LiteMath::float4x4> instances;
+  instances.reserve(m_numInstances);
 
-  VkDeviceSize zero_offset = 0u;
-  VkBuffer vertexBuf = m_pScnMgr->GetVertexBuffer();
-  VkBuffer indexBuf  = m_pScnMgr->GetIndexBuffer();
-  
-  vkCmdBindVertexBuffers(a_cmdBuff, 0, 1, &vertexBuf, &zero_offset);
-  vkCmdBindIndexBuffer(a_cmdBuff, indexBuf, 0, VK_INDEX_TYPE_UINT32);
+  for (size_t i = 1; i <= m_numInstances; i++) {
+    instances.emplace_back(
+      LiteMath::translate4x4({uniform(generator), 0, uniform(generator)})
+    );
+  }
+  memcpy(m_uboPositionMatrices, instances.data(), sizeof(LiteMath::float4x4) * instances.size());
+}
 
-  pushConst2M.projView = a_wvp;
+void SimpleShadowmapRender::ExecuteComputeShader(VkCommandBuffer a_cmdBuff, const float4x4 &a_wvp)
+{
+  CreateInstances();
+  vkCmdFillBuffer(a_cmdBuff, instanceCount.get(), 0, VK_WHOLE_SIZE, 0);
+  vkCmdFillBuffer(a_cmdBuff, outputInstances.get(), 0, VK_WHOLE_SIZE, 0);
+  VkShaderStageFlags stageFlags = (VK_SHADER_STAGE_COMPUTE_BIT);
+  pushConstInst.projView = a_wvp;
   for (uint32_t i = 0; i < m_pScnMgr->InstancesNum(); ++i)
   {
-    auto inst         = m_pScnMgr->GetInstanceInfo(i);
-    pushConst2M.model = m_pScnMgr->GetInstanceMatrix(i);
+    pushConstInst.bbox = m_pScnMgr->GetInstanceBbox(i);
+    pushConstInst.instancesCount = m_numInstances;
+    vkCmdPushConstants(
+      a_cmdBuff, m_cullingPipeline.getVkPipelineLayout(), stageFlags, 0, sizeof(pushConstInst), &pushConstInst
+    );
+    vkCmdDispatch(a_cmdBuff, pushConstInst.instancesCount / m_workGroupSize + 1, 1, 1);
+    {
+      std::array barriers{
+        // Transfer the shadowmap to depth write layout
+        VkBufferMemoryBarrier2{
+          .sType         = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+          .srcStageMask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+          .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+          .dstStageMask  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+          .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+          .buffer        = instanceCount.get(),
+          .size          = sizeof(int32_t)
+        }
+      };
+      VkDependencyInfo depInfo{
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .dependencyFlags         = VK_DEPENDENCY_BY_REGION_BIT,
+        .bufferMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+        .pBufferMemoryBarriers   = barriers.data(),
+      };
+      vkCmdPipelineBarrier2(a_cmdBuff, &depInfo);
+    }
+  }
+}
+
+void SimpleShadowmapRender::DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp)
+{
+    VkShaderStageFlags stageFlags = (VK_SHADER_STAGE_VERTEX_BIT);
+    VkDeviceSize zero_offset = 0u;
+    VkBuffer vertexBuf = m_pScnMgr->GetVertexBuffer();
+    VkBuffer indexBuf  = m_pScnMgr->GetIndexBuffer();
+    VkDrawIndexedIndirectCommand *indirectBufferMem = (VkDrawIndexedIndirectCommand *)m_sInfoIndirect;
+
+    vkCmdBindVertexBuffers(a_cmdBuff, 0, 1, &vertexBuf, &zero_offset);
+    vkCmdBindIndexBuffer(a_cmdBuff, indexBuf, 0, VK_INDEX_TYPE_UINT32);
+
+    pushConst2M.projView = a_wvp;
+    pushConst2M.model = m_pScnMgr->GetInstanceMatrix(0);
+
+    auto mesh_info                     = m_pScnMgr->GetMeshInfo(m_pScnMgr->GetInstanceInfo(0).mesh_id);
+    indirectBufferMem->firstIndex      = mesh_info.m_indexOffset;
+    indirectBufferMem->firstInstance   = 0;
+    indirectBufferMem->indexCount      = mesh_info.m_indNum;
+    indirectBufferMem->instanceCount   = *(uint*)m_uboInstanceCount;
+    indirectBufferMem->vertexOffset    = mesh_info.m_vertexOffset;
+
     vkCmdPushConstants(a_cmdBuff, m_basicForwardPipeline.getVkPipelineLayout(),
       stageFlags, 0, sizeof(pushConst2M), &pushConst2M);
 
-    auto mesh_info = m_pScnMgr->GetMeshInfo(inst.mesh_id);
-    vkCmdDrawIndexed(a_cmdBuff, mesh_info.m_indNum, 1, mesh_info.m_indexOffset, mesh_info.m_vertexOffset, 0);
-  }
+    vkCmdDrawIndexedIndirect(a_cmdBuff, infoIndirect.get(), 0, 1, 0);
 }
 
 void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkImage a_targetImage, VkImageView a_targetImageView)
@@ -246,9 +345,19 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
   //// draw scene to shadowmap
   //
   {
-    etna::RenderTargetState renderTargets(a_cmdBuff, {2048, 2048}, {}, shadowMap.getView({}));
+    etna::RenderTargetState renderTargets(a_cmdBuff, { 2048, 2048 }, {}, shadowMap.getView({}));
     {
+      auto simpleShadowInfo = etna::get_shader_program("simple_shadow");
+      auto set = etna::create_descriptor_set(simpleShadowInfo.getDescriptorLayoutId(0), { 
+        etna::Binding{ 2, vk::DescriptorBufferInfo{ positionMatrices.get(), 0, VK_WHOLE_SIZE } },
+        etna::Binding{ 3, vk::DescriptorBufferInfo{ outputInstances.get(), 0, VK_WHOLE_SIZE }}
+      });
+      VkDescriptorSet vkSet = set.getVkSet();
       vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_shadowPipeline.getVkPipeline());
+      vkCmdBindDescriptorSets(
+        a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_shadowPipeline.getVkPipelineLayout(),
+        0, 1, &vkSet, 0, VK_NULL_HANDLE
+      );
       DrawSceneCmd(a_cmdBuff, m_lightMatrix);
     }
   }
@@ -311,7 +420,20 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
       };
     vkCmdPipelineBarrier2(a_cmdBuff, &depInfo);
   }
-
+  //// call compute shader
+  {
+    auto cullingInfo = etna::get_shader_program("frustum_culling");
+    auto set = etna::create_descriptor_set(cullingInfo.getDescriptorLayoutId(0), { 
+      etna::Binding{ 0, vk::DescriptorBufferInfo{ positionMatrices.get(), 0, VK_WHOLE_SIZE } }, 
+      etna::Binding{ 1, vk::DescriptorBufferInfo{ instanceCount.get(), 0, VK_WHOLE_SIZE } }, 
+      etna::Binding{ 2, vk::DescriptorBufferInfo{ outputInstances.get(), 0, VK_WHOLE_SIZE } }, 
+    });
+    VkDescriptorSet vkSet = set.getVkSet();
+    vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_COMPUTE, m_cullingPipeline.getVkPipeline());
+    vkCmdBindDescriptorSets(a_cmdBuff, VK_PIPELINE_BIND_POINT_COMPUTE, 
+      m_cullingPipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, VK_NULL_HANDLE);
+    ExecuteComputeShader(a_cmdBuff, m_worldViewProj);
+  }
   //// draw final scene to screen
   //
   {
@@ -319,7 +441,9 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
 
     auto set = etna::create_descriptor_set(simpleMaterialInfo.getDescriptorLayoutId(0), {
       etna::Binding {0, vk::DescriptorBufferInfo {constants.get(), 0, VK_WHOLE_SIZE}},
-      etna::Binding {1, vk::DescriptorImageInfo {defaultSampler.get(), shadowMap.getView({}), vk::ImageLayout::eShaderReadOnlyOptimal}}
+      etna::Binding {1, vk::DescriptorImageInfo {defaultSampler.get(), shadowMap.getView({}), vk::ImageLayout::eShaderReadOnlyOptimal}},
+      etna::Binding {2, vk::DescriptorBufferInfo {positionMatrices.get(), 0, VK_WHOLE_SIZE}},
+      etna::Binding {3, vk::DescriptorBufferInfo {outputInstances.get(), 0, VK_WHOLE_SIZE}}
     });
 
     VkDescriptorSet vkSet = set.getVkSet();

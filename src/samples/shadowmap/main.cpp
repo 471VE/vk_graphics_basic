@@ -32,7 +32,7 @@ int main()
     "python compile_shadowmap_shaders.py"
   );
 
-  constexpr int WIDTH = 1024;
+  constexpr int WIDTH  = 1024;
   constexpr int HEIGHT = 1024;
 
   std::shared_ptr<IRender> app = std::make_unique<SimpleShadowmapRender>(WIDTH, HEIGHT);
@@ -46,7 +46,7 @@ int main()
 
   initVulkanGLFW(app, window);
 
-  app->LoadScene(VK_GRAPHICS_BASIC_ROOT "/resources/scenes/chestnut/statex_00001.xml", false);
+  app->LoadScene(VK_GRAPHICS_BASIC_ROOT "/resources/scenes/pine/statex_00001.xml", false);
 
   mainLoop(app, window);
 

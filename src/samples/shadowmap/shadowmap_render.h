@@ -47,6 +47,11 @@ private:
   etna::Image shadowMap;
   etna::Sampler defaultSampler;
   etna::Buffer constants;
+  
+  etna::Buffer positionMatrices;
+  etna::Buffer instanceCount;
+  etna::Buffer outputInstances;
+  etna::Buffer infoIndirect;
 
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 
@@ -67,12 +72,25 @@ private:
     float4x4 model;
   } pushConst2M;
 
+  struct
+  {
+    float4x4 projView;
+    Box4f bbox;
+    uint32_t instancesCount;
+  } pushConstInst;
+
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    
 
   UniformParams m_uniforms {};
   void* m_uboMappedMem = nullptr;
+  
+  void* m_uboPositionMatrices = nullptr;
+  void* m_uboInstanceCount = nullptr;
+  void* m_uboOutputInstances = nullptr;
+  void* m_sInfoIndirect = nullptr;
 
+  etna::ComputePipeline m_cullingPipeline{};
   etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
 
@@ -80,6 +98,9 @@ private:
   
   VkSurfaceKHR m_surface = VK_NULL_HANDLE;
   VulkanSwapChain m_swapchain;
+
+  uint32_t m_numInstances = 10000;
+  uint32_t m_workGroupSize = 32;
 
   Camera   m_cam;
   uint32_t m_width  = 1024u;
@@ -91,11 +112,15 @@ private:
   std::vector<const char*> m_deviceExtensions;
   std::vector<const char*> m_instanceExtensions;
 
-  std::shared_ptr<SceneManager>     m_pScnMgr;
+  std::shared_ptr<SceneManager> m_pScnMgr;
   
-  std::shared_ptr<vk_utils::IQuad>               m_pFSQuad;
-  VkDescriptorSet       m_quadDS; 
+  std::shared_ptr<vk_utils::IQuad> m_pFSQuad;
+  VkDescriptorSet m_quadDS;  
   VkDescriptorSetLayout m_quadDSLayout = nullptr;
+
+  VkDescriptorSet m_computeDS;
+  VkDescriptorSetLayout m_computeDSLayout = nullptr;
+
 
   struct InputControlMouseEtc
   {
@@ -132,6 +157,8 @@ private:
 
   void BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkImage a_targetImage, VkImageView a_targetImageView);
 
+  void ExecuteComputeShader(VkCommandBuffer a_cmdBuff, const float4x4 &a_wvp);
+  void CreateInstances();
   void DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp);
 
   void loadShaders();
