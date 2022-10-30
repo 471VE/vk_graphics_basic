@@ -114,9 +114,15 @@ static void print_prog_info(const std::string &name)
 
 void SimpleShadowmapRender::loadShaders()
 {
-  etna::create_program("simple_material",
-    {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple_shadow.frag.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
-  etna::create_program("simple_shadow", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
+  etna::create_program("simple_material", {
+    VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple_shadow.frag.spv",
+    VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv",
+    VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.geom.spv"
+  });
+  etna::create_program("simple_shadow", {
+    VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv",
+    VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.geom.spv"
+  });
 }
 
 void SimpleShadowmapRender::SetupSimplePipeline()
@@ -174,7 +180,7 @@ void SimpleShadowmapRender::DestroyPipelines()
 
 void SimpleShadowmapRender::DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp)
 {
-  VkShaderStageFlags stageFlags = (VK_SHADER_STAGE_VERTEX_BIT);
+  VkShaderStageFlags stageFlags = (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT);
 
   VkDeviceSize zero_offset = 0u;
   VkBuffer vertexBuf = m_pScnMgr->GetVertexBuffer();
@@ -248,7 +254,16 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
   {
     etna::RenderTargetState renderTargets(a_cmdBuff, {2048, 2048}, {}, shadowMap.getView({}));
     {
+      auto simpleShadowInfo = etna::get_shader_program("simple_shadow");
+      auto set = etna::create_descriptor_set(simpleShadowInfo.getDescriptorLayoutId(0), {
+        etna::Binding{ 0, vk::DescriptorBufferInfo{ constants.get(), 0, VK_WHOLE_SIZE } }
+      });
+
+      VkDescriptorSet vkSet = set.getVkSet();
       vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_shadowPipeline.getVkPipeline());
+      vkCmdBindDescriptorSets(
+        a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_shadowPipeline.getVkPipelineLayout(),
+        0, 1, &vkSet, 0, VK_NULL_HANDLE);
       DrawSceneCmd(a_cmdBuff, m_lightMatrix);
     }
   }
