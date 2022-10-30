@@ -26,6 +26,12 @@ void initVulkanGLFW(std::shared_ptr<IRender> &app, GLFWwindow* window)
 
 int main()
 {
+  std::system(
+    "cd resources/shaders && "
+    "python compile_simple_compute_shaders.py && "
+    "python compile_shadowmap_shaders.py"
+  );
+
   constexpr int WIDTH = 1024;
   constexpr int HEIGHT = 1024;
 
@@ -40,7 +46,7 @@ int main()
 
   initVulkanGLFW(app, window);
 
-  app->LoadScene(VK_GRAPHICS_BASIC_ROOT "/resources/scenes/043_cornell_normals/statex_00001.xml", false);
+  app->LoadScene(VK_GRAPHICS_BASIC_ROOT "/resources/scenes/chestnut/statex_00001.xml", false);
 
   mainLoop(app, window);
 
