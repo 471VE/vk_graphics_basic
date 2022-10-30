@@ -27,21 +27,21 @@ layout(std430, binding = 2) buffer VisibleIndices {
 
 bool isObjectVisible(mat4 M, BoundingBox box) {
     vec4 bbox_vertices[8] = {
-        {box.firstVertex.x,  box.firstVertex.y,  box.firstVertex.z,  1.0}, 
-        {box.secondVertex.x, box.firstVertex.y,  box.firstVertex.z,  1.0}, 
-        {box.firstVertex.x,  box.secondVertex.y, box.firstVertex.z,  1.0}, 
-        {box.secondVertex.x, box.secondVertex.y, box.firstVertex.z,  1.0},
-        {box.firstVertex.x,  box.firstVertex.y,  box.secondVertex.z, 1.0},
-        {box.secondVertex.x, box.firstVertex.y,  box.secondVertex.z, 1.0},
-        {box.firstVertex.x,  box.secondVertex.y, box.secondVertex.z, 1.0},
-        {box.secondVertex.x, box.secondVertex.y, box.secondVertex.z, 1.0},
+        {box.firstVertex.x,  box.firstVertex.y,  box.firstVertex.z,  1.f}, 
+        {box.secondVertex.x, box.firstVertex.y,  box.firstVertex.z,  1.f}, 
+        {box.firstVertex.x,  box.secondVertex.y, box.firstVertex.z,  1.f}, 
+        {box.secondVertex.x, box.secondVertex.y, box.firstVertex.z,  1.f},
+        {box.firstVertex.x,  box.firstVertex.y,  box.secondVertex.z, 1.f},
+        {box.secondVertex.x, box.firstVertex.y,  box.secondVertex.z, 1.f},
+        {box.firstVertex.x,  box.secondVertex.y, box.secondVertex.z, 1.f},
+        {box.secondVertex.x, box.secondVertex.y, box.secondVertex.z, 1.f},
     };
 
     for (uint i = 0; i < 8; ++i) {
         vec4 corner = M * bbox_vertices[i];
         if (-corner.w <= corner.x && corner.x <= corner.w &&
             -corner.w <= corner.y && corner.y <= corner.w &&
-            0.0 <= corner.z && corner.z <= corner.w)
+            0.f <= corner.z && corner.z <= corner.w)
             return true;
     }
     return false;
