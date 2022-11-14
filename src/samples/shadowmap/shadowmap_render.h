@@ -50,6 +50,11 @@ private:
 
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 
+  struct {
+    etna::Image albedo;
+    etna::Image normalMap;
+  } gBuffer;
+
   struct
   {
     uint32_t    currentFrame      = 0u;
@@ -65,7 +70,14 @@ private:
   {
     float4x4 projView;
     float4x4 model;
+    uint32_t type;
   } pushConst2M;
+
+  struct
+  {
+    float4x4 projInv;
+    float4x4 viewInv;
+  } transformsInversed;
 
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    
@@ -73,8 +85,9 @@ private:
   UniformParams m_uniforms {};
   void* m_uboMappedMem = nullptr;
 
-  etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
+  etna::GraphicsPipeline m_gBuffersPipeline {};
+  etna::GraphicsPipeline m_deferredShadingPipeline {};
 
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
   
@@ -136,7 +149,7 @@ private:
 
   void loadShaders();
 
-  void SetupSimplePipeline();
+  void SetupSimplePipeline();  
   void RecreateSwapChain();
 
   void UpdateUniformBuffer(float a_time);

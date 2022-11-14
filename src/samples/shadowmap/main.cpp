@@ -28,7 +28,6 @@ int main()
 {
   std::system(
     "cd resources/shaders && "
-    "python compile_simple_compute_shaders.py && "
     "python compile_shadowmap_shaders.py"
   );
 
