@@ -62,6 +62,8 @@ void SimpleShadowmapRender::DeallocateResources()
   shadowMap.reset();
 
   constants = etna::Buffer();
+  // Removes validation errors upon window closing
+  m_swapchain.Cleanup();
 }
 
 

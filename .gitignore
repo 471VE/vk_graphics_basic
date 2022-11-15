@@ -3,3 +3,5 @@ build
 external
 .vs
 .cache
+shadowmap_renderer.exe
+shadowmap_renderer.pdb
