@@ -93,7 +93,7 @@ private:
   {
     float4x4 projView;
     Box4f bbox;
-    uint32_t instancesCount;
+    uint32_t instancesCount = 10000;
   } pushConstInst;
 
 
@@ -105,17 +105,29 @@ private:
   VkDeviceMemory m_uboAlloc = VK_NULL_HANDLE;
   void* m_uboMappedMem = nullptr;
 
-  void* m_uboPositionMatrices = nullptr;
-  void* m_uboInstanceCount = nullptr;
-  void* m_uboOutputInstances = nullptr;
-  void* m_sInfoIndirect = nullptr;
+  VkBuffer m_positionMatrices = VK_NULL_HANDLE;
+  VkDeviceMemory m_positionMatricesAlloc = VK_NULL_HANDLE;
+  void* m_positionMatricesMappedMem = nullptr;
 
+  VkBuffer m_instanceCount = VK_NULL_HANDLE;
+  VkDeviceMemory m_instanceCountAlloc = VK_NULL_HANDLE;
+  void* m_instanceCountMappedMem = nullptr;
+
+  VkBuffer m_outputInstances = VK_NULL_HANDLE;
+  VkDeviceMemory m_outputInstancesAlloc = VK_NULL_HANDLE;
+  void* m_outputInstancesMappedMem = nullptr;
+
+  pipeline_data_t m_teapotsPipeline {};
   pipeline_data_t m_cullingPipeline {};
   pipeline_data_t m_basicForwardPipeline {};
   pipeline_data_t m_shadowPipeline {};
 
   VkDescriptorSet m_dSet = VK_NULL_HANDLE;
   VkDescriptorSetLayout m_dSetLayout = VK_NULL_HANDLE;
+
+  VkDescriptorSet m_dSetTeapots = VK_NULL_HANDLE;
+  VkDescriptorSetLayout m_dSetTeapotsLayout = VK_NULL_HANDLE;
+  
   VkRenderPass m_screenRenderPass = VK_NULL_HANDLE; // main renderpass
 
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
@@ -150,6 +162,9 @@ private:
   VkDeviceMemory        m_memShadowMap = VK_NULL_HANDLE;
   VkDescriptorSet       m_quadDS; 
   VkDescriptorSetLayout m_quadDSLayout = nullptr;
+
+  VkDescriptorSet       m_computeDS;
+  VkDescriptorSetLayout m_computeDSLayout = nullptr;
 
   struct InputControlMouseEtc
   {
@@ -188,6 +203,7 @@ private:
                                 VkImageView a_targetImageView, VkPipeline a_pipeline);
 
   void DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp);
+  void DrawManyTeapots(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp);
 
   void SetupSimplePipeline();
   void CleanupPipelineAndSwapchain();

@@ -25,6 +25,12 @@ void initVulkanGLFW(std::shared_ptr<IRender> &app, GLFWwindow* window, int devic
 
 int main()
 {
+  #ifdef WIN32
+    std::system("cd resources/shaders && python compile_shadowmap_shaders.py");
+  #else
+    std::system("cd resources/shaders && python3 compile_shadowmap_shaders.py");
+  #endif
+
   constexpr int WIDTH = 1024;
   constexpr int HEIGHT = 1024;
   constexpr int VULKAN_DEVICE_ID = 0;

@@ -39,9 +39,10 @@ bool isObjectVisible(mat4 M, BoundingBox box) {
 
     for (uint i = 0; i < 8; ++i) {
         vec4 corner = M * bbox_vertices[i];
-        if (-corner.w <= corner.x && corner.x <= corner.w &&
-            -corner.w <= corner.y && corner.y <= corner.w &&
-            0.f <= corner.z && corner.z <= corner.w)
+        corner /= corner.w;
+        if (-1.f <= corner.x && corner.x <= 1.f &&
+            -1.f <= corner.y && corner.y <= 1.f &&
+            0.f <= corner.z && corner.z <= 1.f)
             return true;
     }
     return false;
