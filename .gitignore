@@ -1,3 +1,7 @@
 bin
 build
 external
+shadowmap_renderer.exe
+shadowmap_renderer.pdb
+simple_compute.exe
+quad_renderer.exe

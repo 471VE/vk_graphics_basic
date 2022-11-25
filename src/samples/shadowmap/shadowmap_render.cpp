@@ -90,7 +90,7 @@ void SimpleShadowmapRender::InitPresentation(VkSurfaceKHR &a_surface, bool)
   // create full screen quad for debug purposes
   // 
   m_pFSQuad = std::make_shared<vk_utils::QuadRenderer>(0,0, 512, 512);
-  m_pFSQuad->Create(m_device, "../resources/shaders/quad3_vert.vert.spv", "../resources/shaders/quad.frag.spv", 
+  m_pFSQuad->Create(m_device, "resources/shaders/quad3_vert.vert.spv", "resources/shaders/quad.frag.spv", 
                     vk_utils::RenderTargetInfo2D{ VkExtent2D{ m_width, m_height }, m_swapchain.GetFormat(),                                        // this is debug full scree quad
                                                   VK_ATTACHMENT_LOAD_OP_LOAD, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR }); // seems we need LOAD_OP_LOAD if we want to draw quad to part of screen
 
@@ -200,8 +200,8 @@ void SimpleShadowmapRender::SetupSimplePipeline()
   //
   std::unordered_map<VkShaderStageFlagBits, std::string> shader_paths;
   {
-    shader_paths[VK_SHADER_STAGE_FRAGMENT_BIT] = "../resources/shaders/simple_shadow.frag.spv";
-    shader_paths[VK_SHADER_STAGE_VERTEX_BIT]   = "../resources/shaders/simple.vert.spv";
+    shader_paths[VK_SHADER_STAGE_FRAGMENT_BIT] = "resources/shaders/simple_shadow.frag.spv";
+    shader_paths[VK_SHADER_STAGE_VERTEX_BIT]   = "resources/shaders/simple.vert.spv";
   }
   maker.LoadShaders(m_device, shader_paths);
 
@@ -216,7 +216,7 @@ void SimpleShadowmapRender::SetupSimplePipeline()
   //
   // maker.SetDefaultState(m_width, m_height);
   shader_paths.clear();
-  shader_paths[VK_SHADER_STAGE_VERTEX_BIT] = "../resources/shaders/simple.vert.spv";
+  shader_paths[VK_SHADER_STAGE_VERTEX_BIT] = "resources/shaders/simple.vert.spv";
   maker.LoadShaders(m_device, shader_paths);
 
   maker.viewport.width  = float(m_pShadowMap2->m_resolution.width);
@@ -492,9 +492,9 @@ void SimpleShadowmapRender::ProcessInput(const AppInput &input)
   if(input.keyPressed[GLFW_KEY_B])
   {
 #ifdef WIN32
-    std::system("cd ../resources/shaders && python compile_shadowmap_shaders.py");
+    std::system("cd resources/shaders && python compile_shadowmap_shaders.py");
 #else
-    std::system("cd ../resources/shaders && python3 compile_shadowmap_shaders.py");
+    std::system("cd resources/shaders && python3 compile_shadowmap_shaders.py");
 #endif
 
     SetupSimplePipeline();

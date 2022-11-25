@@ -89,6 +89,14 @@ private:
     float4x4 model;
   } pushConst2M;
 
+  struct
+  {
+    float4x4 projView;
+    Box4f bbox;
+    uint32_t instancesCount;
+  } pushConstInst;
+
+
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    
 
@@ -97,6 +105,12 @@ private:
   VkDeviceMemory m_uboAlloc = VK_NULL_HANDLE;
   void* m_uboMappedMem = nullptr;
 
+  void* m_uboPositionMatrices = nullptr;
+  void* m_uboInstanceCount = nullptr;
+  void* m_uboOutputInstances = nullptr;
+  void* m_sInfoIndirect = nullptr;
+
+  pipeline_data_t m_cullingPipeline {};
   pipeline_data_t m_basicForwardPipeline {};
   pipeline_data_t m_shadowPipeline {};
 

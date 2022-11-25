@@ -1,0 +1,59 @@
+#version 430
+
+layout( local_size_x = 32 ) in;
+
+struct BoundingBox {
+    vec4 firstVertex;
+    vec4 secondVertex;
+};
+
+layout( push_constant ) uniform params {
+    mat4 mProjView;
+    BoundingBox bbox;
+    uint instanceCount;
+} PushConstInst;
+
+layout(std430, binding = 0) readonly buffer PositionMatrices {
+    mat4 positionMatrices[];
+};
+
+layout(std430, binding = 1) buffer VisibleObjectsCount {
+    uint visibleObjectsCount;
+};
+
+layout(std430, binding = 2) buffer VisibleIndices {
+    uint visibleObjectsIndices[];
+};
+
+bool isObjectVisible(mat4 M, BoundingBox box) {
+    vec4 bbox_vertices[8] = {
+        {box.firstVertex.x,  box.firstVertex.y,  box.firstVertex.z,  1.f}, 
+        {box.secondVertex.x, box.firstVertex.y,  box.firstVertex.z,  1.f}, 
+        {box.firstVertex.x,  box.secondVertex.y, box.firstVertex.z,  1.f}, 
+        {box.secondVertex.x, box.secondVertex.y, box.firstVertex.z,  1.f},
+        {box.firstVertex.x,  box.firstVertex.y,  box.secondVertex.z, 1.f},
+        {box.secondVertex.x, box.firstVertex.y,  box.secondVertex.z, 1.f},
+        {box.firstVertex.x,  box.secondVertex.y, box.secondVertex.z, 1.f},
+        {box.secondVertex.x, box.secondVertex.y, box.secondVertex.z, 1.f},
+    };
+
+    for (uint i = 0; i < 8; ++i) {
+        vec4 corner = M * bbox_vertices[i];
+        if (-corner.w <= corner.x && corner.x <= corner.w &&
+            -corner.w <= corner.y && corner.y <= corner.w &&
+            0.f <= corner.z && corner.z <= corner.w)
+            return true;
+    }
+    return false;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx < PushConstInst.instanceCount) {
+        mat4 M = PushConstInst.mProjView * positionMatrices[idx];
+        if (isObjectVisible(M, PushConstInst.bbox)) {
+            uint new_idx = atomicAdd(visibleObjectsCount, 1);
+            visibleObjectsIndices[new_idx] = idx;
+        }
+    }
+}
