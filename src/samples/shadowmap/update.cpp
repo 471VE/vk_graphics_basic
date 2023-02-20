@@ -24,16 +24,8 @@ void SimpleShadowmapRender::UpdateView()
   m_worldViewProj = mWorldViewProj;
   
   ///// calc light matrix
-  //
-  if(m_light.usePerspectiveM)
-    mProj = perspectiveMatrix(m_light.cam.fov, 1.0f, 1.0f, m_light.lightTargetDist*2.0f);
-  else
-    mProj = ortoMatrix(-m_light.radius, +m_light.radius, -m_light.radius, +m_light.radius, 0.0f, m_light.lightTargetDist);
-
-  if(m_light.usePerspectiveM)  // don't understang why fix is not needed for perspective case for shadowmap ... it works for common rendering  
-    mProjFix = LiteMath::float4x4();
-  else
-    mProjFix = OpenglToVulkanProjectionMatrixFix(); 
+  mProj = perspectiveMatrix(m_light.cam.fov, 1.0f, 1.0f, m_light.lightTargetDist*2.0f);
+  mProjFix = LiteMath::float4x4();
   
   mLookAt       = LiteMath::lookAt(m_light.cam.pos, m_light.cam.pos + m_light.cam.forward()*10.0f, m_light.cam.up);
   m_lightMatrix = mProjFix*mProj*mLookAt;
@@ -44,6 +36,10 @@ void SimpleShadowmapRender::UpdateUniformBuffer(float a_time)
   m_uniforms.lightMatrix = m_lightMatrix;
   m_uniforms.lightPos    = m_light.cam.pos; //LiteMath::float3(sinf(a_time), 1.0f, cosf(a_time));
   m_uniforms.time        = a_time;
+
+  m_uniforms.spotlightDirection = m_light.cam.forward();
+  m_uniforms.spotlightInnerCos  = cos(spotlightInnerAngle  * M_PI / 180);
+  m_uniforms.spotlightCutoffCos = cos(spotlightCutoffAngle * M_PI / 180);
 
   memcpy(m_uboMappedMem, &m_uniforms, sizeof(m_uniforms));
 }
