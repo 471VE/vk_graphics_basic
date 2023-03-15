@@ -32,8 +32,6 @@ struct input_sample
 
 } g_inputDesktop;
 
-AppInput g_appInput;
-
 void onKeyboardPressedBasic(GLFWwindow* window, int key, int, int action, int)
 {
   switch (key)
@@ -54,9 +52,9 @@ void onKeyboardPressedBasic(GLFWwindow* window, int key, int, int action, int)
       if(key >= 0 && key < AppInput::MAXKEYS)
       {
         if (action == GLFW_RELEASE)
-          g_appInput.keyReleased[key] = true;
+          AppInput::get().keyReleased[key] = true;
         else if(action == GLFW_PRESS)
-          g_appInput.keyPressed[key] = true;
+          AppInput::get().keyPressed[key] = true;
       }
       break;
   }
@@ -190,7 +188,7 @@ void mainLoop(std::shared_ptr<IRender> &app, GLFWwindow* window, bool displayGUI
   int avgCounter = 0;
   int currCam    = 0;
 
-  g_appInput.cams[0] = app->GetCurrentCamera();
+  AppInput::get().cams[0] = app->GetCurrentCamera();
   double lastTime = glfwGetTime();
   while (!glfwWindowShouldClose(window))
   {
@@ -198,16 +196,16 @@ void mainLoop(std::shared_ptr<IRender> &app, GLFWwindow* window, bool displayGUI
     double diffTime = thisTime - lastTime;
     lastTime        = thisTime;
     
-    g_appInput.clearKeys();
+    AppInput::get().clearKeys();
     glfwPollEvents();
     
-    if(g_appInput.keyReleased[GLFW_KEY_L])
+    if(AppInput::get().keyReleased[GLFW_KEY_L])
       currCam = 1 - currCam;
 
-    UpdateCamera(window, g_appInput.cams[currCam], static_cast<float>(diffTime));
+    UpdateCamera(window, AppInput::get().cams[currCam], static_cast<float>(diffTime));
     
-    app->ProcessInput(g_appInput);
-    app->UpdateCamera(g_appInput.cams, 2);
+    app->ProcessInput(AppInput::get());
+    app->UpdateCamera(AppInput::get().cams, 2);
     if(displayGUI)
       app->DrawFrame(static_cast<float>(thisTime), DrawMode::WITH_GUI);
     else

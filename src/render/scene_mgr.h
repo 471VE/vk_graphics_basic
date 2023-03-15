@@ -58,6 +58,8 @@ struct SceneManager
   LiteMath::float4x4 GetInstanceMatrix(uint32_t instId) const {assert(instId < m_instanceMatrices.size()); return m_instanceMatrices[instId];}
   LiteMath::Box4f GetSceneBbox() const {return sceneBbox;}
 
+  void GenerateTesselatedQuadMesh(int resolution, float3 pos, float scale);
+
 private:
   void LoadGeoDataOnGPU();
 
