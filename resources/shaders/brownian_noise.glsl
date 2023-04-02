@@ -44,3 +44,40 @@ float fbm(vec2 pos)
     }
     return value/t;
 }
+
+// https://www.shadertoy.com/view/wdsfDH
+mat3 m = mat3(0.00, 1.60, 1.20, -1.60, 0.72, -0.96, -1.20, -0.96, 1.28);
+
+// hash function              
+float hash(float n)
+{
+    return fract(cos(n) * 114514.1919);
+}
+
+// 3d noise function
+float noise(in vec3 x)
+{
+    vec3 p = floor(x);
+    vec3 f = smoothstep(0.0, 1.0, fract(x));
+        
+    float n = p.x + p.y * 10.0 + p.z * 100.0;
+    
+    return mix(
+        mix(mix(hash(n + 0.0), hash(n + 1.0), f.x),
+            mix(hash(n + 10.0), hash(n + 11.0), f.x), f.y),
+        mix(mix(hash(n + 100.0), hash(n + 101.0), f.x),
+            mix(hash(n + 110.0), hash(n + 111.0), f.x), f.y), f.z);
+}
+
+// Fractional Brownian motion
+float fbm(vec3 p)
+{
+    float f = 0.5000 * noise(p);
+    p = m * p;
+    f += 0.2500 * noise(p);
+    p = m * p;
+    f += 0.1666 * noise(p);
+    p = m * p;
+    f += 0.0834 * noise(p);
+    return f;
+}

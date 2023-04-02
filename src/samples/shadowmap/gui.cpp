@@ -16,6 +16,11 @@ void SimpleShadowmapRender::SetupGUIElements()
     ImGui::SliderFloat("Minimum terrain height", &pushConst2M.minHeight, 0.0f, pushConst2M.maxHeight);
     ImGui::SliderFloat("Maximum terrain height ", &pushConst2M.maxHeight, pushConst2M.minHeight, 6.f);
 
+    ImGui::Text("\nNoise");
+    ImGui::SliderFloat("Exctinction", &m_extinction, 0.0f, 1.f);
+    ImGui::SliderFloat3("Scale", m_noiseScale.M, 0.0f, 10.f);
+    ImGui::SliderFloat3("Bounds", m_semiAxes.M, 1.0f, 12.5f);
+
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
     ImGui::NewLine();
