@@ -20,7 +20,9 @@ void SimpleShadowmapRender::UpdateView()
   auto mProj = projectionMatrix(m_cam.fov, aspect, 0.1f, 1000.0f);
   auto mLookAt = LiteMath::lookAt(m_cam.pos, m_cam.lookAt, m_cam.up);
   auto mWorldViewProj = mProjFix * mProj * mLookAt;
-  
+  m_uniforms.view = mLookAt;
+  m_uniforms.proj = mProjFix * mProj;
+  m_uniforms.viewInverse = LiteMath::inverse4x4(mLookAt);
   m_worldViewProj = mWorldViewProj;
   
   ///// calc light matrix
@@ -63,9 +65,9 @@ void SimpleShadowmapRender::ProcessInput(const AppInput &input)
   if(input.keyPressed[GLFW_KEY_B])
   {
 #ifdef WIN32
-    std::system("cd ../resources/shaders && python compile_shadowmap_shaders.py");
+    std::system("cd resources/shaders && python compile_shadowmap_shaders.py");
 #else
-    std::system("cd ../resources/shaders && python3 compile_shadowmap_shaders.py");
+    std::system("cd resources/shaders && python3 compile_shadowmap_shaders.py");
 #endif
 
     etna::reload_shaders();
