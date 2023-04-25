@@ -79,6 +79,14 @@ void SimpleShadowmapRender::AllocateResources()
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage
   });
 
+  hdrImage = m_context->createImage(etna::Image::CreateInfo
+  {
+    .extent = vk::Extent3D{m_width, m_height, 1},
+    .name = "hdr_image",
+    .format = vk::Format::eR16G16B16A16Sfloat,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
+  });
+
   defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
   constants = m_context->createBuffer(etna::Buffer::CreateInfo
   {
@@ -165,6 +173,7 @@ void SimpleShadowmapRender::DeallocateResources()
   gBuffer.albedo.reset();
   gBuffer.ssao.reset();
   gBuffer.blurredSsao.reset();
+  hdrImage.reset();
   m_swapchain.Cleanup();
   vkDestroySurfaceKHR(GetVkInstance(), m_surface, nullptr);  
 
@@ -210,6 +219,8 @@ void SimpleShadowmapRender::loadShaders()
   etna::create_program("calculate_ssao",
     { VK_GRAPHICS_BASIC_ROOT"/resources/shaders/ssao.frag.spv", VK_GRAPHICS_BASIC_ROOT "/resources/shaders/quad3_vert.vert.spv" });
   etna::create_program("gaussian_blur", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/gaussian_blur.comp.spv"});
+  etna::create_program("tonemapping",
+    {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/tonemapping.frag.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/quad3_vert.vert.spv"});
 }
 
 void SimpleShadowmapRender::SetupSimplePipeline()
@@ -222,7 +233,7 @@ void SimpleShadowmapRender::SetupSimplePipeline()
   m_pBindings = std::make_shared<vk_utils::DescriptorMaker>(m_context->getDevice(), dtypes, 2);
   
   m_pBindings->BindBegin(VK_SHADER_STAGE_FRAGMENT_BIT);
-  m_pBindings->BindImage(0, gBuffer.shadowMap.getView({}), defaultSampler.get(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  m_pBindings->BindImage(0, hdrImage.getView({}), defaultSampler.get(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   m_pBindings->BindEnd(&m_quadDS, &m_quadDSLayout);
 
   etna::VertexShaderInputDescription sceneVertexInputDesc
@@ -248,7 +259,7 @@ void SimpleShadowmapRender::SetupSimplePipeline()
       .vertexShaderInput = sceneVertexInputDesc,
       .fragmentShaderOutput =
         {
-          .colorAttachmentFormats = {static_cast<vk::Format>(m_swapchain.GetFormat())},
+          .colorAttachmentFormats = {vk::Format::eR16G16B16A16Sfloat},
           .depthAttachmentFormat = vk::Format::eD32Sfloat
         }
     });
@@ -277,7 +288,7 @@ void SimpleShadowmapRender::SetupSimplePipeline()
     {
       .fragmentShaderOutput =
         {
-          .colorAttachmentFormats = { static_cast<vk::Format>(m_swapchain.GetFormat()) },
+          .colorAttachmentFormats = { vk::Format::eR16G16B16A16Sfloat },
         }
     });
   m_ssaoPipeline = pipelineManager.createGraphicsPipeline("calculate_ssao",
@@ -288,6 +299,10 @@ void SimpleShadowmapRender::SetupSimplePipeline()
         }
     });
   m_gaussianBlurPipeline = pipelineManager.createComputePipeline("gaussian_blur", {});
+  m_tonemappingPipeline = pipelineManager.createGraphicsPipeline("tonemapping",
+    {
+      .fragmentShaderOutput = { .colorAttachmentFormats = {static_cast<vk::Format>(m_swapchain.GetFormat())} }
+    });
 }
 
 void SimpleShadowmapRender::DestroyPipelines()
@@ -426,13 +441,35 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
     });
     VkDescriptorSet vkSet = set.getVkSet();
 
-    etna::RenderTargetState renderTargets(a_cmdBuff, {m_width, m_height}, {{a_targetImage, a_targetImageView}}, {});
+    etna::RenderTargetState renderTargets(a_cmdBuff, {m_width, m_height}, {{hdrImage}}, {});
 
     vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_resolveGbufferPipeline.getVkPipeline());
     vkCmdBindDescriptorSets(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS,
       m_resolveGbufferPipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, VK_NULL_HANDLE);
 
     vkCmdDraw(a_cmdBuff, 4, 1, 0, 0);
+  }
+
+    etna::set_state(a_cmdBuff, hdrImage.get(), vk::PipelineStageFlagBits2::eFragmentShader,
+    vk::AccessFlagBits2::eShaderRead, vk::ImageLayout::eShaderReadOnlyOptimal,
+    vk::ImageAspectFlagBits::eColor);
+
+  etna::flush_barriers(a_cmdBuff);
+  {
+    auto outputInfo = etna::get_shader_program("tonemapping");
+    auto set = etna::create_descriptor_set(outputInfo.getDescriptorLayoutId(0), a_cmdBuff,
+    {
+      etna::Binding {0, constants.genBinding()},
+      etna::Binding {1, hdrImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+    });
+    VkDescriptorSet vkSet = set.getVkSet();
+
+    etna::RenderTargetState renderTargets(a_cmdBuff, {m_width, m_height}, {{a_targetImage, a_targetImageView}}, {});
+
+    vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_tonemappingPipeline.getVkPipeline());
+    vkCmdBindDescriptorSets(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+      m_tonemappingPipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, VK_NULL_HANDLE);
+    vkCmdDraw(a_cmdBuff, 3, 1, 0, 0);
   }
 
   if(m_input.drawFSQuad)

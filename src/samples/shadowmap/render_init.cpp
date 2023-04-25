@@ -10,6 +10,8 @@ SimpleShadowmapRender::SimpleShadowmapRender(uint32_t a_width, uint32_t a_height
   m_uniforms.ssaoRadius = 0.25f;
   m_uniforms.ssaoKernelSize = 64;
   m_uniforms.ssaoNoiseSize = 4;
+  m_uniforms.lightIntensity = 1.f;
+  m_uniforms.tonemappingMode = 0;
 }
 
 void SimpleShadowmapRender::InitVulkan(const char** a_instanceExtensions, uint32_t a_instanceExtensionsCount, uint32_t)

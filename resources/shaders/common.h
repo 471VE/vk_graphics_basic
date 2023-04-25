@@ -56,6 +56,8 @@ struct UniformParams
   shader_uint  ssaoNoiseSize;
   shader_uint  ssaoKernelSize;
   shader_float ssaoRadius;
+  shader_float lightIntensity;
+  shader_uint  tonemappingMode;
 };
 
 #endif // VK_GRAPHICS_BASIC_COMMON_H

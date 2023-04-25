@@ -55,6 +55,7 @@ private:
     etna::Image blurredSsao;
   } gBuffer;
 
+  etna::Image hdrImage; 
   etna::Sampler defaultSampler;
   etna::Buffer constants;
   etna::Buffer ssaoSamples;
@@ -92,6 +93,7 @@ private:
   etna::GraphicsPipeline m_resolveGbufferPipeline {};
   etna::GraphicsPipeline m_ssaoPipeline {};
   etna::ComputePipeline m_gaussianBlurPipeline {};
+  etna::GraphicsPipeline m_tonemappingPipeline {};
 
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
   
