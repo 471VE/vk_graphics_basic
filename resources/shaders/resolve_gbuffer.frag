@@ -30,14 +30,17 @@ layout (binding = 9) buffer rsmSamplesBuf
 };
 
 #define PI 3.1415926538
+#define rsmRmax 0.18f
+#define rsmSamplesNum 400
+#define indirectIlluminationIntensity 20.f
 
 vec4 indirectIllumination(vec3 wPos, vec3 wNorm, vec2 texCoord)
 {
   vec4 illumination = vec4(0.0f);
-  for (int i = 0; i < 400; ++i)
+  for (int i = 0; i < rsmSamplesNum; ++i)
   {
     const vec2 rnd = rsmSamples[i];
-    const vec2 coords = texCoord + Params.rsmRmax * rnd.x * vec2(sin(2 * PI * rnd.y), cos(2 * PI * rnd.y));
+    const vec2 coords = texCoord + rsmRmax * rnd.x * vec2(sin(2 * PI * rnd.y), cos(2 * PI * rnd.y));
     const vec3 wPosSample = texture(lightViewWposition, coords).xyz;
     const vec3 wNormSample = texture(lightViewWnormal, coords).xyz;
     const vec4 fluxSample = texture(flux, coords);
@@ -46,18 +49,29 @@ vec4 indirectIllumination(vec3 wPos, vec3 wNorm, vec2 texCoord)
       * max(0, dot(wNorm, wPosSample - wPos))
       / pow(length(wPos - wPosSample), 4);
   }
-  return clamp(illumination * Params.indirectIlluminationIntensity, 0.0f, 1.0f);
+  return clamp(illumination / rsmSamplesNum * indirectIlluminationIntensity, 0.0f, 1.0f);
 }
+
+vec3 T(float s) {
+    return vec3(0.233, 0.455, 0.649) * exp(-s*s/0.0064) + \
+           vec3(0.1, 0.336, 0.344) * exp(-s*s/0.0484) + \
+           vec3(0.118, 0.198, 0.0) * exp(-s*s/0.187) + \
+           vec3(0.113, 0.007, 0.007) * exp(-s*s/0.567) + \
+           vec3(0.358, 0.004, 0.0) * exp(-s*s/1.99) + \
+           vec3(0.078, 0.0, 0.0) * exp(-s*s/7.41);
+}
+
 
 void main()
 {
   const vec3 wPos = (Params.viewInverse * vec4(texture(positionMap, vsOut.texCoord).xyz, 1.0)).xyz;
   const vec4 posLightClipSpace = Params.lightMatrix*vec4(wPos, 1.0f);
   const vec3 posLightSpaceNDC  = posLightClipSpace.xyz/posLightClipSpace.w;    // for orto matrix, we don't need perspective division, you can remove it if you want; this is general case;
-  vec2 shadowTexCoord    = posLightSpaceNDC.xy*0.5f + vec2(0.5f, 0.5f);  // just shift coords from [-1,1] to [0,1]               
+  vec2 shadowTexCoord    = posLightSpaceNDC.xy*0.5f + vec2(0.5f, 0.5f);  // just shift coords from [-1,1] to [0,1]
+  const float sampledShadowDepth = texture(shadowMap, shadowTexCoord).x;
 
   const bool  outOfView = (shadowTexCoord.x < 0.0001f || shadowTexCoord.x > 0.9999f || shadowTexCoord.y < 0.0091f || shadowTexCoord.y > 0.9999f);
-  const float shadow    = ((posLightSpaceNDC.z < textureLod(shadowMap, shadowTexCoord, 0).x + 0.001f) || outOfView) ? 1.0f : 0.0f;
+  const float shadow    = ((posLightSpaceNDC.z < sampledShadowDepth + 0.001f) || outOfView) ? 1.0f : 0.0f;
 
   const vec3 normal = (Params.viewInverse * texture(normalMap, vsOut.texCoord)).xyz;
   vec4 ambient = vec4(0.1f);
@@ -66,8 +80,8 @@ void main()
 
   const vec4 dark_violet = vec4(0.59f, 0.0f, 0.82f, 1.0f);
   const vec4 chartreuse  = vec4(0.5f, 1.0f, 0.0f, 1.0f);
+  const vec3 subsurfaceColor = vec3(0.4f, 0.2f, 0.1f);
 
-  vec4 lightColor1 = mix(dark_violet, chartreuse, abs(sin(Params.time)))  * Params.lightIntensity;
   vec4 lightColor2 = vec4(1.0f, 1.0f, 1.0f, 1.0f) * Params.lightIntensity;
 
   vec4 albedo     = texture(albedoMap, vsOut.texCoord);
@@ -84,5 +98,21 @@ void main()
     if (Params.directIlluminationEnabled)
       directLight += lightColor * shadow;
     out_fragColor = (directLight + ambient * occlusion) * albedo;
+    if (Params.sssEnabled)
+    {
+      bool condition = true;
+      if (Params.sssForTeapot)
+        condition = albedo.xyz == vec3(1.f);
+      if (condition)
+      {
+        vec4 unscaledViewPos = Params.projInverse * vec4(shadowTexCoord * 2 - 1, sampledShadowDepth, 1.0f);
+        float linearShadowDepth = (unscaledViewPos.xyz/unscaledViewPos.w).z;
+        float linearLightDepth = (Params.lightView * vec4(wPos, 1.0f)).z;
+        float s = abs(linearShadowDepth - linearLightDepth) / 10.f;
+        float E = max(0.3 + dot(-normal, lightDir), 0.0);
+        vec3 transmittance = T(s) * subsurfaceColor * E;
+        out_fragColor += vec4(transmittance, 1.0f);
+      }
+    }
   }
 }

@@ -27,10 +27,14 @@ layout (binding = 4) buffer ssaoNoise
     vec4 ssaoNoiseVector[];
 };
 
+#define ssaoRadius 0.25f
+#define ssaoNoiseSize 4
+#define ssaoKernelSize 64
+
 vec3 sample_noise(vec2 coord)
 {
-  vec2 noiseCoord = mod(vec2(coord.x * 1024, coord.y * 1024), Params.ssaoNoiseSize - 1);
-  return  ssaoNoiseVector[uint(noiseCoord.x * Params.ssaoNoiseSize + noiseCoord.y)].xyz;
+  vec2 noiseCoord = mod(vec2(coord.x * 1024, coord.y * 1024), ssaoNoiseSize - 1);
+  return  ssaoNoiseVector[uint(noiseCoord.x * ssaoNoiseSize + noiseCoord.y)].xyz;
 }
 
 void main()
@@ -42,17 +46,17 @@ void main()
   vec3 bitangent = cross(normal, tangent);
   mat3 TBN = mat3(tangent, bitangent, normal);
   float occlusion = 0.f;
-  for (int i = 0; i < Params.ssaoKernelSize; ++i)
+  for (int i = 0; i < ssaoKernelSize; ++i)
   {
     vec3 ssaoSample = TBN * samples[i].xyz;
-    ssaoSample = fragPos + ssaoSample * Params.ssaoRadius;
+    ssaoSample = fragPos + ssaoSample * ssaoRadius;
     vec4 offset = Params.proj * vec4(ssaoSample, 1.f);
     offset.xyz /= offset.w;
     offset.xyz = offset.xyz * 0.5 + 0.5;
     float sampleDepth = texture(gPosition, offset.xy).z;
-    float rangeCheck = smoothstep(0.0, 1.0, Params.ssaoRadius / abs(fragPos.z - sampleDepth));
+    float rangeCheck = smoothstep(0.0, 1.0, ssaoRadius / abs(fragPos.z - sampleDepth));
     occlusion += (sampleDepth >= ssaoSample.z + 0.025 ? 1.0 : 0.0) * rangeCheck;
   }
-  occlusion = 1.0 - (occlusion / Params.ssaoKernelSize);
+  occlusion = 1.0 - (occlusion / ssaoKernelSize);
   out_fragColor = occlusion;  
 }

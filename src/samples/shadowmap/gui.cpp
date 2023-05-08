@@ -9,11 +9,7 @@ void SimpleShadowmapRender::SetupGUIElements()
   ImGui::NewFrame();
   {
 //    ImGui::ShowDemoWindow();
-    ImGui::Begin("Simple render settings");
-
-    ImGui::ColorEdit3("Meshes base color", m_uniforms.baseColor.M, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_NoInputs);
-    ImGui::SliderFloat3("Light source position", m_uniforms.lightPos.M, -10.f, 10.f);
-    
+    ImGui::Begin("Render settings");
     ImGui::Checkbox("SSAO", (bool*)&m_uniforms.ssaoEnabled);
     static const std::array modeNames{"None", "Reinhard", "Reinhard-Jodie", "Uncharted 2 Filmic", "ACES", "Approximate ACES"};
     ImGui::Combo("Tonemapping", reinterpret_cast<int*>(&m_uniforms.tonemappingMode), modeNames.data(), static_cast<int>(modeNames.size()));
@@ -21,6 +17,10 @@ void SimpleShadowmapRender::SetupGUIElements()
     ImGui::Checkbox("Direct Illumination", (bool*)&m_uniforms.directIlluminationEnabled);
     ImGui::SameLine(0.f, 30.f);
     ImGui::Checkbox("Indirect Illumination", (bool*)&m_uniforms.indirectIlluminationEnabled);
+    ImGui::Checkbox("Subsurface Scattering", (bool*)&m_uniforms.sssEnabled);
+    ImGui::SameLine(0.f, 30.f);
+    ImGui::RadioButton("For teapot", reinterpret_cast<int*>(&m_uniforms.sssForTeapot), 1); ImGui::SameLine();
+    ImGui::RadioButton("For everything", reinterpret_cast<int*>(&m_uniforms.sssForTeapot), 0);
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 

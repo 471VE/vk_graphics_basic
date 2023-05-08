@@ -7,15 +7,12 @@ SimpleShadowmapRender::SimpleShadowmapRender(uint32_t a_width, uint32_t a_height
 {
   m_uniforms.baseColor = LiteMath::float3(0.9f, 0.92f, 1.0f);
   m_uniforms.ssaoEnabled = true;
-  m_uniforms.ssaoRadius = 0.25f;
-  m_uniforms.ssaoKernelSize = 64;
-  m_uniforms.ssaoNoiseSize = 4;
   m_uniforms.lightIntensity = 1.f;
   m_uniforms.tonemappingMode = 0;
-  m_uniforms.rsmRmax = 0.180f;
   m_uniforms.indirectIlluminationEnabled = true;
   m_uniforms.directIlluminationEnabled = true;
-  m_uniforms.indirectIlluminationIntensity  = 0.05f;
+  m_uniforms.sssEnabled = true;
+  m_uniforms.sssForTeapot = false;
 }
 
 void SimpleShadowmapRender::InitVulkan(const char** a_instanceExtensions, uint32_t a_instanceExtensionsCount, uint32_t)

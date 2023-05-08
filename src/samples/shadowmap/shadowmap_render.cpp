@@ -140,7 +140,7 @@ void SimpleShadowmapRender::AllocateResources()
 
   ssaoSamples = m_context->createBuffer(etna::Buffer::CreateInfo
   {
-    .size        = sizeof(float4) * m_uniforms.ssaoKernelSize,
+    .size        = sizeof(float4) * m_ssaoKernelSize,
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
     .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
     .name = "ssao_samples"
@@ -148,7 +148,7 @@ void SimpleShadowmapRender::AllocateResources()
 
   ssaoNoise = m_context->createBuffer(etna::Buffer::CreateInfo
   {
-    .size        = sizeof(float4) * m_uniforms.ssaoNoiseSize * m_uniforms.ssaoNoiseSize,
+    .size        = sizeof(float4) * m_ssaoNoiseSize * m_ssaoNoiseSize,
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
     .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
     .name = "ssao_noise"
@@ -167,8 +167,8 @@ void SimpleShadowmapRender::AllocateResources()
 
   void *ssaoSamplesMappedMem = ssaoSamples.map();
   std::vector<float4> ssaoSamplesVec;
-  ssaoSamplesVec.reserve(m_uniforms.ssaoKernelSize);
-  for (uint32_t i = 0; i < m_uniforms.ssaoKernelSize; ++i)
+  ssaoSamplesVec.reserve(m_ssaoKernelSize);
+  for (uint32_t i = 0; i < m_ssaoKernelSize; ++i)
   {
     float4 sample = {get_random_float() * 2.f - 1.f, get_random_float() * 2.f - 1.f, get_random_float(), 0.0};
     ssaoSamplesVec.push_back(LiteMath::normalize(sample) * get_random_float());
@@ -177,9 +177,9 @@ void SimpleShadowmapRender::AllocateResources()
   ssaoSamples.unmap();
 
   void *ssaoNoiseMappedMem = ssaoNoise.map();
-  std::vector<float4> ssaoNoiseVec(m_uniforms.ssaoNoiseSize*m_uniforms.ssaoNoiseSize,
+  std::vector<float4> ssaoNoiseVec(m_ssaoNoiseSize*m_ssaoNoiseSize,
                                    {get_random_float() * 2.f - 1.f, get_random_float() * 2.f - 1.f, 0.f, 0.0f});
-  memcpy(ssaoNoiseMappedMem, ssaoNoiseVec.data(), m_uniforms.ssaoNoiseSize*m_uniforms.ssaoNoiseSize*sizeof(float4));
+  memcpy(ssaoNoiseMappedMem, ssaoNoiseVec.data(), m_ssaoNoiseSize*m_ssaoNoiseSize*sizeof(float4));
   ssaoNoise.unmap();
   
   m_gaussian_kernel.resize(m_gaussian_kernel_length);

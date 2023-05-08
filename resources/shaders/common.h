@@ -67,20 +67,18 @@ struct UniformParams
   shader_mat4  view;
   shader_mat4  viewInverse;
   shader_mat4  proj;
+  shader_mat4  projInverse;
+  shader_mat4  lightView;
   shader_vec3  lightPos;
   shader_float time;
   shader_vec3  baseColor;
-  shader_bool  animateLightColor;
   shader_bool  ssaoEnabled;
-  shader_uint  ssaoNoiseSize;
-  shader_uint  ssaoKernelSize;
-  shader_float ssaoRadius;
   shader_float lightIntensity;
   shader_uint  tonemappingMode;
-  shader_float rsmRmax;
   shader_bool directIlluminationEnabled;
   shader_bool  indirectIlluminationEnabled;
-  shader_float indirectIlluminationIntensity;
+  shader_bool sssEnabled;
+  shader_bool sssForTeapot;
 };
 
 #endif // VK_GRAPHICS_BASIC_COMMON_H

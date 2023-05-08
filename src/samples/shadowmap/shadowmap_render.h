@@ -111,6 +111,8 @@ private:
   uint32_t m_gaussian_kernel_length = 23;
   std::vector<float> m_gaussian_kernel;
   uint m_gauss_window = 21;
+  uint m_ssaoNoiseSize = 4;
+  uint m_ssaoKernelSize = 64;
   bool m_vsync = false;
 
   vk::PhysicalDeviceFeatures m_enabledDeviceFeatures = {};
