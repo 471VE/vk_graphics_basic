@@ -12,6 +12,10 @@ SimpleShadowmapRender::SimpleShadowmapRender(uint32_t a_width, uint32_t a_height
   m_uniforms.ssaoNoiseSize = 4;
   m_uniforms.lightIntensity = 1.f;
   m_uniforms.tonemappingMode = 0;
+  m_uniforms.rsmRmax = 0.180f;
+  m_uniforms.indirectIlluminationEnabled = true;
+  m_uniforms.directIlluminationEnabled = true;
+  m_uniforms.indirectIlluminationIntensity  = 20.f;
 }
 
 void SimpleShadowmapRender::InitVulkan(const char** a_instanceExtensions, uint32_t a_instanceExtensionsCount, uint32_t)

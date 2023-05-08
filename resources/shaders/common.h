@@ -39,6 +39,25 @@ using shader_bool  = LiteMath::uint;
 
 #define shader_bool  bool
 
+vec3 getColor(uint colorNo)
+{
+  switch (colorNo)
+  {
+    case 0: // Room walls
+      return vec3(1.f, 1.f, 0.2f);;            
+    case 1: // Teapot
+      return vec3(1.f);            
+    case 2: // Box
+      return vec3(0.3f, 1.f, 0.3f);            
+    case 3: // Cylinder
+      return vec3(1.f, 0.2f, 0.2f);            
+    case 4: // L-shaped figure
+      return vec3(0.1f, 0.1f, 1.f);            
+    case 5: // Sphere
+      return vec3(0.f, 1.f, 1.f);       
+  }
+}
+
 #endif
 
 
@@ -58,6 +77,10 @@ struct UniformParams
   shader_float ssaoRadius;
   shader_float lightIntensity;
   shader_uint  tonemappingMode;
+  shader_float rsmRmax;
+  shader_bool directIlluminationEnabled;
+  shader_bool  indirectIlluminationEnabled;
+  shader_float indirectIlluminationIntensity;
 };
 
 #endif // VK_GRAPHICS_BASIC_COMMON_H

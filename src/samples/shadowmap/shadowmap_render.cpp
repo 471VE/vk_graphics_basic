@@ -19,6 +19,24 @@ static float get_random_float()
   return uniform(generator);
 }
 
+static float halton_sequence(int i)
+{
+  float f = 1, r = 0;
+  while (i > 0)
+  {
+    f = f / 2;
+    r = r + f * (i % 2);
+    i = i / 2;
+  }
+  return r;
+}
+
+static float2 get_halton_float2()
+{
+  static int i = 0;
+  return {halton_sequence(i++), halton_sequence(i++)};
+}
+
 /// RESOURCE ALLOCATION
 
 void SimpleShadowmapRender::AllocateResources()
@@ -33,7 +51,7 @@ void SimpleShadowmapRender::AllocateResources()
 
   gBuffer.shadowMap = m_context->createImage(etna::Image::CreateInfo
   {
-    .extent = vk::Extent3D{2048, 2048, 1},
+    .extent = vk::Extent3D{4096, 4096, 1},
     .name = "shadow_map",
     .format = vk::Format::eD16Unorm,
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled
@@ -79,6 +97,30 @@ void SimpleShadowmapRender::AllocateResources()
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage
   });
 
+  gBuffer.lightViewWposition = m_context->createImage(etna::Image::CreateInfo
+  {
+    .extent = vk::Extent3D{4096, 4096, 1},
+    .name = "gbuffer_light_view_world_position",
+    .format = vk::Format::eR32G32B32A32Sfloat,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage
+  });
+
+  gBuffer.lightViewWnormal = m_context->createImage(etna::Image::CreateInfo
+  {
+    .extent = vk::Extent3D{4096, 4096, 1},
+    .name = "gbuffer_light_view_world_normal",
+    .format = vk::Format::eR32G32B32A32Sfloat,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
+  });
+
+  gBuffer.flux = m_context->createImage(etna::Image::CreateInfo
+  {
+    .extent = vk::Extent3D{4096, 4096, 1},
+    .name = "rsm_flux",
+    .format = vk::Format::eR8G8B8A8Srgb,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
+  });
+
   hdrImage = m_context->createImage(etna::Image::CreateInfo
   {
     .extent = vk::Extent3D{m_width, m_height, 1},
@@ -87,7 +129,7 @@ void SimpleShadowmapRender::AllocateResources()
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
   });
 
-  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
+  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.addressMode = vk::SamplerAddressMode::eClampToBorder, .name = "default_sampler"});
   constants = m_context->createBuffer(etna::Buffer::CreateInfo
   {
     .size = sizeof(UniformParams),
@@ -110,6 +152,14 @@ void SimpleShadowmapRender::AllocateResources()
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
     .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
     .name = "ssao_noise"
+  });
+
+  rsmSamples = m_context->createBuffer(etna::Buffer::CreateInfo
+  {
+    .size = sizeof(float2) * 128,
+    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+    .name = "rsm_samples"
   });
   
 
@@ -146,6 +196,15 @@ void SimpleShadowmapRender::AllocateResources()
   for (uint32_t i = 0; i < m_gaussian_kernel_length; i++) {
     m_gaussian_kernel[i] /= sum;
   }
+
+  void* rsmSamplesMappedMem = rsmSamples.map();
+  auto rsmSamplesVec = std::vector<float2>();
+  rsmSamplesVec.reserve(400);
+  for (size_t i = 0; i < 400; i++)
+    rsmSamplesVec.push_back(get_halton_float2());
+
+  memcpy(rsmSamplesMappedMem, rsmSamplesVec.data(), rsmSamplesVec.size());
+  rsmSamples.unmap();
 }
 
 void SimpleShadowmapRender::LoadScene(const char* path, bool transpose_inst_matrices)
@@ -173,6 +232,9 @@ void SimpleShadowmapRender::DeallocateResources()
   gBuffer.albedo.reset();
   gBuffer.ssao.reset();
   gBuffer.blurredSsao.reset();
+  gBuffer.lightViewWposition.reset();
+  gBuffer.lightViewWnormal.reset();
+  gBuffer.flux.reset();
   hdrImage.reset();
   m_swapchain.Cleanup();
   vkDestroySurfaceKHR(GetVkInstance(), m_surface, nullptr);  
@@ -180,6 +242,7 @@ void SimpleShadowmapRender::DeallocateResources()
   constants = etna::Buffer();
   ssaoSamples = etna::Buffer();
   ssaoNoise = etna::Buffer();
+  rsmSamples = etna::Buffer();
 }
 
 
@@ -211,7 +274,8 @@ void SimpleShadowmapRender::loadShaders()
 {
   etna::create_program("simple_material",
     {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple_shadow.frag.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
-  etna::create_program("simple_shadow", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
+  etna::create_program("simple_shadow",
+    {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/flux.frag.spv"});
   etna::create_program("prepare_gbuffer",
     {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/prepare_gbuffer.frag.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
   etna::create_program("resolve_gbuffer",
@@ -266,8 +330,13 @@ void SimpleShadowmapRender::SetupSimplePipeline()
   m_shadowPipeline = pipelineManager.createGraphicsPipeline("simple_shadow",
     {
       .vertexShaderInput = sceneVertexInputDesc,
+      .blendingConfig = 
+        {
+          .attachments = {blendAttachment, blendAttachment, blendAttachment}
+        },
       .fragmentShaderOutput =
         {
+          .colorAttachmentFormats = {vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Sfloat, vk::Format::eR8G8B8A8Srgb},
           .depthAttachmentFormat = vk::Format::eD16Unorm
         }
     });
@@ -352,7 +421,9 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
   //// draw scene to shadowmap
   //
   {
-    etna::RenderTargetState renderTargets(a_cmdBuff, {2048, 2048}, {}, gBuffer.shadowMap);
+    etna::RenderTargetState renderTargets(a_cmdBuff, {4096, 4096}, {
+        {gBuffer.lightViewWposition}, {gBuffer.lightViewWnormal}, {gBuffer.flux}
+      }, gBuffer.shadowMap);
 
     vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_shadowPipeline.getVkPipeline());
     DrawSceneCmd(a_cmdBuff, m_lightMatrix);
@@ -438,6 +509,10 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
       etna::Binding {3, gBuffer.normal.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding {4, gBuffer.albedo.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
       etna::Binding {5, gBuffer.blurredSsao.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding {6, gBuffer.lightViewWposition.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding {7, gBuffer.lightViewWnormal.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding {8, gBuffer.flux.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)},
+      etna::Binding {9, rsmSamples.genBinding()},
     });
     VkDescriptorSet vkSet = set.getVkSet();
 

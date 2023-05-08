@@ -4,9 +4,9 @@
 
 #include "common.h"
 
-layout (location = 0) out vec3 position;
-layout (location = 1) out vec3 normal;
-layout (location = 2) out vec3 albedo;
+layout (location = 0) out vec3 lightViewWposition;
+layout (location = 1) out vec3 lightViewWnormal;
+layout (location = 2) out vec3 flux;
 
 layout (location = 0) in VS_OUT
 {
@@ -29,7 +29,7 @@ layout (binding = 0, set = 0) uniform AppData
 
 void main()
 {
-  position = (Params.view * vec4(vsOut.wPos, 1.0)).xyz;
-  normal = (Params.view * vec4(vsOut.wNorm, 0.0)).xyz;
-  albedo = getColor(PushConstant.colorNo);
+  lightViewWposition = vsOut.wPos;
+  lightViewWnormal = vsOut.wNorm;
+  flux = getColor(PushConstant.colorNo);
 }
