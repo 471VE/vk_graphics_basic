@@ -53,6 +53,9 @@ private:
     etna::Image shadowMap;
     etna::Image ssao;
     etna::Image blurredSsao;
+    etna::Image lightViewWposition;
+    etna::Image lightViewWnormal;
+    etna::Image flux;
   } gBuffer;
 
   etna::Image hdrImage; 
@@ -60,6 +63,7 @@ private:
   etna::Buffer constants;
   etna::Buffer ssaoSamples;
   etna::Buffer ssaoNoise;
+  etna::Buffer rsmSamples;
 
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 

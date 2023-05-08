@@ -16,9 +16,11 @@ void SimpleShadowmapRender::SetupGUIElements()
     
     ImGui::Checkbox("SSAO", (bool*)&m_uniforms.ssaoEnabled);
     static const std::array modeNames{"None", "Reinhard", "Reinhard-Jodie", "Uncharted 2 Filmic", "ACES", "Approximate ACES"};
-    uint32_t prevMode = m_uniforms.tonemappingMode;
     ImGui::Combo("Tonemapping", reinterpret_cast<int*>(&m_uniforms.tonemappingMode), modeNames.data(), static_cast<int>(modeNames.size()));
     ImGui::SliderFloat("Light Intensity", &m_uniforms.lightIntensity, 0.f, 5.f);
+    ImGui::Checkbox("Direct Illumination", (bool*)&m_uniforms.directIlluminationEnabled);
+    ImGui::SameLine(0.f, 30.f);
+    ImGui::Checkbox("Indirect Illumination", (bool*)&m_uniforms.indirectIlluminationEnabled);
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
